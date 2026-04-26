@@ -25,6 +25,11 @@ UNMAPPED isn't just a dashboard; it's a policy tool:
 - **Targeted Training**: Local bodies can analyze the **Skill-Gap Checklist** (tasks users have or haven't ticked) to organize specific vocational training courses that directly address the workforce's weaknesses.
 - **Actual Earning Data**: By collecting self-reported "Actual Earnings" from users, the platform provides the government with the most accurate data on the informal economy's true value.
 
+## 🛠️ Implementation & Technology
+The platform is built on a **Modern Web & Data Stack** featuring **Vite + React** and **Tailwind CSS** for a premium, high-performance frontend. The core logic is powered by a **Python-based mapping engine** that utilizes fuzzy logic and exclusion cross-referencing to enable the three-tier mapping (Standard, Recognized, Identified), ensuring sub-second search results and a seamless user experience.
+
+Our data architecture is anchored by authoritative sources: **Nepal Rastra Bank (NRB)** provides the FY 2024/25 monthly earning baselines, while the **ISCO-08 (International Standard)**, sourced from the **World Bank**, provides the formal definitions and "Included/Excluded" lists. These datasets are processed directly from the repository's Excel files into an optimized JSON database, creating a robust, locally relevant "Transition Engine" for Nepal’s labor force.
+
 ## 🚀 How to Run
 ```bash
 npm install
