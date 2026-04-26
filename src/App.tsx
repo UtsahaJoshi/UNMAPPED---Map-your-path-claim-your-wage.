@@ -35,30 +35,37 @@ const App: React.FC = () => {
     if (!search || search.length < 2) return [];
     const query = search.toLowerCase();
     
-    return (rawData as Occupation[])
-      .map(occ => {
-        let score = 0;
-        let mappingType: MappingType = 'Identified';
-        
-        if (occ.title.toLowerCase().includes(query)) {
-          score += 10;
-          mappingType = 'Standard';
-        } else if (occ.included.toLowerCase().includes(query)) {
-          score += 8;
-          mappingType = 'Recognized';
-        } else if (occ.excluded.toLowerCase().includes(query)) {
-          score += 5;
-          mappingType = 'Identified';
-        } else if (occ.definition.toLowerCase().includes(query)) {
-          score += 2;
-          mappingType = 'Identified';
-        }
-        
-        return { ...occ, score, mappingType };
-      })
-      .filter(occ => occ.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
+    // Pass 1: Find all potential matches
+    const matches = (rawData as Occupation[]).map(occ => {
+      let score = 0;
+      let isIncluded = occ.title.toLowerCase().includes(query) || occ.included.toLowerCase().includes(query);
+      let isExcluded = occ.excluded.toLowerCase().includes(query);
+      
+      if (isIncluded) score += 10;
+      if (isExcluded) score += 5;
+      if (occ.definition.toLowerCase().includes(query)) score += 2;
+      
+      return { ...occ, score, isIncluded, isExcluded };
+    }).filter(m => m.score > 0);
+
+    // Pass 2: Categorize based on global context
+    const results = matches.map(m => {
+      let mappingType: MappingType = 'Identified';
+      
+      const hasOtherInclusion = matches.some(other => other.isIncluded && other.code !== m.code);
+      
+      if (m.isIncluded) {
+        mappingType = 'Standard';
+      } else if (m.isExcluded && hasOtherInclusion) {
+        mappingType = 'Recognized';
+      } else if (m.isExcluded) {
+        mappingType = 'Identified';
+      }
+      
+      return { ...m, mappingType };
+    });
+
+    return results.sort((a, b) => b.score - a.score).slice(0, 8);
   }, [search]);
 
   const handleSelect = (occ: ScoredOccupation) => {
