@@ -1,0 +1,2 @@
+"interface LogicBridgeProps {\n  currentTerm: string;\n  target: OccupationData;\n  mg9Wage: number;\n  customWage: number | null;\n  setCustomWage: (val: number | null) => void;\n  wageUnit: 'monthly' | 'daily' | 'hourly';\n  setWageUnit: (unit: 'monthly'
+<truncated 6504 bytes>

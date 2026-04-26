@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx skills *)",
+      "Bash(python3 *)",
+      "Bash(file *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(pip install *)",
+      "Bash(python video/generate-narration.py)",
+      "Bash(python -m pip install edge-tts)",
+      "Bash(dir C:\\\\Users\\\\Ripple\\\\UNMAPPED\\\\public\\\\narration *)",
+      "Bash(python -c ' *)",
+      "Bash(python video/generate-narration-demo.py)"
+    ]
+  }
+}
