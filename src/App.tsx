@@ -33,17 +33,26 @@ const App: React.FC = () => {
 
   const filteredResults = useMemo(() => {
     if (!search || search.length < 2) return [];
-    const query = search.toLowerCase();
+    const query = search.toLowerCase().trim();
+    const queryWords = query.split(/\s+/);
     
     // Pass 1: Find all potential matches
     const matches = (rawData as Occupation[]).map(occ => {
       let score = 0;
-      let isIncluded = occ.title.toLowerCase().includes(query) || occ.included.toLowerCase().includes(query);
-      let isExcluded = occ.excluded.toLowerCase().includes(query);
+      const titleLower = occ.title.toLowerCase();
+      const includedLower = occ.included.toLowerCase();
+      const excludedLower = occ.excluded.toLowerCase();
+      const defLower = occ.definition.toLowerCase();
+
+      // Check if ALL query words are present in a field
+      const matchesField = (field: string) => queryWords.every(word => field.includes(word));
+      
+      let isIncluded = matchesField(titleLower) || matchesField(includedLower);
+      let isExcluded = matchesField(excludedLower);
       
       if (isIncluded) score += 10;
-      if (isExcluded) score += 5;
-      if (occ.definition.toLowerCase().includes(query)) score += 2;
+      if (isExcluded) score += 20; // HEAVY BOOST: Identified/Recognized should be first
+      if (matchesField(defLower)) score += 2;
       
       return { ...occ, score, isIncluded, isExcluded };
     }).filter(m => m.score > 0);
@@ -51,6 +60,15 @@ const App: React.FC = () => {
     // Pass 2: Categorize based on global context
     const results = matches.map(m => {
       let mappingType: MappingType = 'Identified';
+      let specificMatch = '';
+
+      if (m.title.toLowerCase().includes(query)) {
+        specificMatch = m.title;
+      } else {
+        // Find which word/phrase matched in included or excluded
+        const allText = `${m.included} ${m.excluded}`.split('\n');
+        specificMatch = allText.find(line => queryWords.every(word => line.toLowerCase().includes(word)))?.replace(/^- |Examples of |Some related | elsewhere:|\d+/g, '').trim() || '';
+      }
       
       const hasOtherInclusion = matches.some(other => other.isIncluded && other.code !== m.code);
       
@@ -62,13 +80,13 @@ const App: React.FC = () => {
         mappingType = 'Identified';
       }
       
-      return { ...m, mappingType };
+      return { ...m, mappingType, specificMatch };
     });
 
-    return results.sort((a, b) => b.score - a.score).slice(0, 8);
+    return results.sort((a, b) => b.score - a.score).slice(0, 15);
   }, [search]);
 
-  const handleSelect = (occ: ScoredOccupation) => {
+  const handleSelect = (occ: ScoredOccupation & { specificMatch: string }) => {
     setSelectedOcc(occ);
     setShowDashboard(true);
     setSearch('');
@@ -109,16 +127,18 @@ const App: React.FC = () => {
               </div>
 
               {filteredResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-4 bg-white rounded-2xl shadow-2xl overflow-hidden z-50 border border-black/5">
+                <div className="absolute top-full left-0 right-0 mt-4 bg-white rounded-2xl shadow-2xl overflow-y-auto max-h-[450px] z-50 border border-black/5">
                   {filteredResults.map(occ => (
                     <div 
                       key={occ.code} 
                       className="p-6 border-b border-black/5 hover:bg-gray-50 cursor-pointer transition-all flex justify-between items-center group"
-                      onClick={() => handleSelect(occ)}
+                      onClick={() => handleSelect(occ as any)}
                     >
                       <div className="text-left">
                         <div className="flex items-center gap-2">
-                           <div className="font-bold text-lg group-hover:text-primary transition-colors">{occ.title}</div>
+                           <div className="font-bold text-lg group-hover:text-primary transition-colors">
+                             {lang === 'EN' ? occ.title : (occ as any).title_ne || occ.title}
+                           </div>
                            <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter ${
                              occ.mappingType === 'Standard' ? 'bg-green-100 text-green-700' : 
                              occ.mappingType === 'Recognized' ? 'bg-blue-100 text-blue-700' : 
@@ -127,7 +147,14 @@ const App: React.FC = () => {
                              {occ.mappingType}
                            </span>
                         </div>
-                        <div className="text-xs opacity-40 uppercase tracking-widest">ISCO Code: {occ.code}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="text-xs opacity-40 uppercase tracking-widest">ISCO Code: {occ.code}</div>
+                          {(occ as any).specificMatch && (occ as any).specificMatch !== occ.title && (
+                            <div className="text-[10px] bg-accent/10 px-2 py-0.5 rounded-full font-bold text-accent border border-accent/20 flex items-center gap-1" style={{ color: UNMAPPED_COLORS.accent, borderColor: `${UNMAPPED_COLORS.accent}33` }}>
+                              <span className="opacity-50">Mapping:</span> {(occ as any).specificMatch} → {occ.title}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-bold text-accent" style={{ color: UNMAPPED_COLORS.accent }}>रू {occ.monthly_wage.toLocaleString()}</div>
@@ -140,7 +167,7 @@ const App: React.FC = () => {
             </div>
           </div>
         ) : (
-          <Dashboard occ={selectedOcc!} onBack={() => setShowDashboard(false)} />
+          <Dashboard occ={selectedOcc!} onBack={() => setShowDashboard(false)} lang={lang} />
         )}
       </main>
 
@@ -160,7 +187,7 @@ const App: React.FC = () => {
   );
 };
 
-const Dashboard: React.FC<{ occ: ScoredOccupation, onBack: () => void }> = ({ occ, onBack }) => {
+const Dashboard: React.FC<{ occ: ScoredOccupation & { specificMatch: string }, onBack: () => void, lang: string }> = ({ occ, onBack, lang }) => {
   const [actualWage, setActualWage] = useState(17138);
   const [checkedSteps, setCheckedSteps] = useState<number[]>([]);
   
@@ -224,7 +251,7 @@ const Dashboard: React.FC<{ occ: ScoredOccupation, onBack: () => void }> = ({ oc
 
         <div className="col-span-4 bg-white/40 p-8 rounded-3xl border border-white/60">
            <div className="text-[10px] uppercase tracking-widest opacity-40 mb-2 font-bold text-accent" style={{ color: UNMAPPED_COLORS.accent }}>FORMAL TARGET POTENTIAL</div>
-           <div className="text-xl font-bold mb-1">{occ.title}</div>
+           <div className="text-xl font-bold mb-1">{lang === 'EN' ? occ.title : (occ as any).title_ne || occ.title}</div>
            <div className="text-4xl font-bold mb-4">रू {occ.monthly_wage.toLocaleString()}</div>
            <div className="text-[10px] font-bold opacity-60 bg-gray-100 px-2 py-1 inline-block rounded uppercase">ISCO Code: {occ.code}</div>
         </div>
@@ -244,7 +271,7 @@ const Dashboard: React.FC<{ occ: ScoredOccupation, onBack: () => void }> = ({ oc
            </div>
            
            <div className="space-y-6">
-              {tasks.map((step, i) => (
+              {(lang === 'EN' ? tasks : ((occ as any).tasks_ne || '').split(';').slice(0,5)).map((step: string, i: number) => (
                 <div 
                   key={i} 
                   className={`flex gap-6 items-start transition-all cursor-pointer group p-4 rounded-2xl ${checkedSteps.includes(i) ? 'bg-white/50 opacity-100' : 'opacity-60 hover:opacity-100 hover:bg-white/30'}`}
@@ -283,7 +310,7 @@ const Dashboard: React.FC<{ occ: ScoredOccupation, onBack: () => void }> = ({ oc
                  </div>
                  <div>
                     <div className="text-[10px] opacity-40 uppercase tracking-widest mb-1">TRANSITION TARGET</div>
-                    <div className="font-bold text-lg">{occ.title}</div>
+                    <div className="font-bold text-lg">{lang === 'EN' ? occ.title : (occ as any).title_ne || occ.title}</div>
                     <div className="text-xs text-accent font-bold uppercase" style={{ color: UNMAPPED_COLORS.accent }}>Status: {occ.mappingType} / Included</div>
                  </div>
               </div>
